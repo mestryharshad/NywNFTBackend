@@ -1,7 +1,7 @@
 const Collection = require("../models/collection");
 const NFT = require("../models/nft");
 const { verifyToken } = require("../services/tokenServices");
-const BuyingHistory = require("../models/buyhistory");
+const { BuyHistory, SellHistory, NftCreateHistory } = require("../models/buyhistory");
 require("dotenv").config();
 const { pinata } = require("../services/pinataServices");
 const { uploadToCloudinary } = require("../services/cloudinaryServices");
@@ -59,47 +59,6 @@ const createNFT = async (req, res) => {
             return res.status(400).json({ status: false, message: "Transaction hash already exists" });
         }
 
-        // // Generate tokenId
-        // const sellCount = await NFT.countDocuments();
-        // const id = sellCount + 1;
-
-        // const metadata = {
-        //     tokenId: tokenId,
-        //     name,
-        //     description,
-        //     collectionName: findCollection.collectionName,
-        // };
-
-        // // // Upload image to Pinata
-        // const fileBuffer = req.file.buffer; // Use buffer directly
-
-        // // Upload image to Pinata
-        // const fileBlob = new Blob([fileBuffer], { type: req.file.mimetype });
-        // const imageResult = await pinata.upload.file(fileBlob, {
-        //     metadata: { name: `${name}-image` },
-        // });
-
-        // if (!imageResult?.IpfsHash) {
-        //     throw new Error("Failed to get CID from image upload");
-        // }
-        // metadata.image = `ipfs://${imageResult.IpfsHash}`;
-
-        // // Upload metadata to Pinata
-        // const metadataResult = await pinata.upload.json(metadata, {
-        //     metadata: { name: `${name}-metadata` },
-        // });
-
-        // if (!metadataResult?.IpfsHash) {
-        //     throw new Error("Failed to get CID from metadata upload");
-        // }
-        // // Create gateway URLs
-        // const pinataGateway = process.env.PINATA_GATEWAY;
-        // if (!pinataGateway) {
-        //     throw new Error("PINATA_GATEWAY is not defined in environment variables");
-        // }
-
-        // const metadataGatewayURL = `${pinataGateway}/ipfs/${metadataResult.IpfsHash}`;
-        // const imageGatewayURL = `${pinataGateway}/ipfs/${imageResult.IpfsHash}`;
 
         // Save NFT to DB
         const nft = {
@@ -120,8 +79,15 @@ const createNFT = async (req, res) => {
             transactionHash,
             quantity,
         };
-
+        const nftCreateHistory = {
+            tokenId,
+            ownerAddress: walletAddress,
+            contractAddress,
+            transactionHash,
+            quantity,
+        }
         await NFT.create(nft);
+        await NftCreateHistory.create(nftCreateHistory);
         await SELLNFT.create(nft)
         return res.status(201).json({ status: true, message: "NFT created successfully", nft });
     } catch (error) {
@@ -132,12 +98,7 @@ const createNFT = async (req, res) => {
 
 const getNFTs = async (req, res) => {
     try {
-        const [sellNft, nft] = await Promise.all([
-            SELLNFT.find({}),
-            NFT.find({}),
-        ]);
-
-        let nfts = [...sellNft, ...nft];
+        const nfts = await NFT.find({});
         return res.status(200).json({
             status: true,
             message: "Get all NFTs for sell",
@@ -148,7 +109,6 @@ const getNFTs = async (req, res) => {
         return res.status(500).json({ message: "Internal server error" });
     }
 };
-
 
 const getNftById = async (req, res) => {
     try {
@@ -230,25 +190,49 @@ const buyNFT = async (req, res) => {
         const remainingQuantity = userNft.quantity - quantity;
         const onSaleStatus = remainingQuantity > 0;
 
-        // Update the SELLNFT collection
-        const updateNFT = await SELLNFT.findOneAndUpdate(
-            { tokenId, contractAddress },
-            {
-                $set: {
-                    isMinted,
-                    onSale: onSaleStatus,
-                    ownedBy: walletAddress,
-                    transactionHash: transactionHash,
-                    price,
-                    buyDate: Date.now(),
-                },
-                // $inc: { quantity: -quantity },
-            }
-        );
+        // // Update the SELLNFT collection
+        // const updateNFT = await SELLNFT.findOneAndUpdate(
+        //     { tokenId, contractAddress },
+        //     {
+        //         $set: {
+        //             isMinted,
+        //             onSale: onSaleStatus,
+        //             ownedBy: walletAddress,
+        //             transactionHash: transactionHash,
+        //             price,
+        //             buyDate: Date.now(),
+        //         },
+        //         // $inc: { quantity: -quantity },
+        //     }
+        // );
 
-        if (!updateNFT) {
-            return res.status(404).json({ status: false, message: "NFT not found" });
+
+        // if (!updateNFT) {
+        //     return res.status(404).json({ status: false, message: "NFT not found" });
+        // }
+
+        // Crete the NFT collection
+        const userNftBuy = {
+            tokenId: userNft.tokenId,
+            name: userNft.name,
+            description: userNft.description,
+            imageUrl: userNft.imageUrl,
+            walletAddress: userNft.walletAddress,
+            collectionId: userNft.collectionId,
+            categoryId: userNft.categoryId,
+            categoryName: userNft.categoryName,
+            collectionName: userNft.collectionName,
+            contractAddress: userNft.contractAddress,
+            transactionHash: transactionHash,
+            price: price,
+            ownedBy: walletAddress,
+            isMinted: true,
+            onSale: false,
+            metadataURL: userNft.metadataURL,
+            ipfsImageUrl: userNft.ipfsImageUrl,
+            quantity: quantity
         }
+        await SELLNFT.create(userNftBuy);
 
         // Create a new entry in BuyingHistory
         const newObj = {
@@ -261,7 +245,7 @@ const buyNFT = async (req, res) => {
             quantity: quantity,
             buyDate: Date.now(),
         };
-        await BuyingHistory.create(newObj);
+        await BuyHistory.create(newObj);
 
         // Update the NFT collection
         await NFT.updateOne(
@@ -281,6 +265,7 @@ const buyNFT = async (req, res) => {
         return res.status(500).json({ message: "Internal server error" });
     }
 };
+
 const listNFTForSale = async (req, res) => {
     try {
         const verification = await verifyToken(req);
@@ -380,7 +365,24 @@ const listNFTForSale = async (req, res) => {
         //         { $set: { onSale: false } }
         //     );
         // }
-
+        const newObj = {
+            tokenId: tokenId,
+            sellerAddress: walletAddress,
+            price: price,
+            contractAddress: contractAddress,
+            transactionHash: transactionHash,
+            quantity: quantity,
+        }
+        await SellHistory.create(newObj)
+        await NFT.findOneAndUpdate(
+            { tokenId, contractAddress },
+            {
+                $set: {
+                    onSale: true,
+                    price: price,
+                },
+            }
+        )
         return res.status(200).json({
             status: true,
             message: "NFT listed for sale successfully",
@@ -560,7 +562,7 @@ const buyingHistoryForUser = async (req, res) => {
             return res.status(401).json({ status: false, message: verification.message });
         }
         const walletAddress = verification.data.data.walletAddress;
-        const buyHistory = await BuyingHistory.find({ buyerAddress: walletAddress });
+        const buyHistory = await BuyHistory.find({ buyerAddress: walletAddress });
         if (!buyHistory || buyHistory.length === 0) {
             return res.status(404).json({ status: false, message: "No buying history found" });
         }
