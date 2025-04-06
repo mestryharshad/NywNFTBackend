@@ -98,7 +98,10 @@ const createNFT = async (req, res) => {
 
 const getNFTs = async (req, res) => {
     try {
-        const nfts = await NFT.find({});
+        // const nfts = await NFT.find({});
+        const nfts = await SELLNFT.find({})
+        console.log(nfts.price);
+        
         return res.status(200).json({
             status: true,
             message: "Get all NFTs for sell",
