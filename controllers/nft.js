@@ -478,7 +478,9 @@ const getOwnedNft = async (req, res) => {
         // const result = [...sellNft, ...nft];
         // console.log(sellNft, "res");
 
-        const result = NFT.find({ ownedBy: walletAddress, isMinted: true });
+        const result = await NFT.find({ ownedBy: walletAddress, isMinted: true });
+        console.log(result);
+        
         // If no NFTs are found, return a 404 response
         if (result.length === 0) {
             return res.status(404).json({ status: false, message: "No owned NFTs found" });
