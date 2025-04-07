@@ -98,10 +98,14 @@ const createNFT = async (req, res) => {
 
 const getNFTs = async (req, res) => {
     try {
-        // const nfts = await NFT.find({});
-        const nfts = await SELLNFT.find({})
-        console.log(nfts.price);
-        
+        const nfts = await NFT.find({});
+        // const nfts = await SELLNFT.find({})
+        // console.log(nfts.price);
+        // const count = await SELLNFT.countDocuments({});
+console.log("Total NFTs in DB:", nfts.length);
+
+// console.log(nfts.map(n => ({ tokenId: n.tokenId, contractAddress: n.contractAddress })));
+
         return res.status(200).json({
             status: true,
             message: "Get all NFTs for sell",
@@ -469,17 +473,17 @@ const getOwnedNft = async (req, res) => {
         }
         const walletAddress = verification.data.data.walletAddress;
         // Fetch both collections in parallel
-        // const [sellNft, nft] = await Promise.all([
-        //     // SELLNFT.find({ ownedBy: walletAddress, isMinted: true }),
-        //     NFT.find({ ownedBy: walletAddress, isMinted: true }),
-        // ]);
+        const [sellNft, nft] = await Promise.all([
+            SELLNFT.find({ ownedBy: walletAddress, isMinted: true }),
+            NFT.find({ ownedBy: walletAddress, isMinted: true }),
+        ]);
 
         // Combine results
-        // const result = [...sellNft, ...nft];
-        // console.log(sellNft, "res");
+        const result = [...sellNft, ...nft];
+        console.log(result.length, "res");
 
-        const result = await NFT.find({ ownedBy: walletAddress, isMinted: true });
-        console.log(result);
+        // const result = await NFT.find({ ownedBy: walletAddress, isMinted: true });
+        // console.log(result);
         
         // If no NFTs are found, return a 404 response
         if (result.length === 0) {
@@ -496,6 +500,51 @@ const getOwnedNft = async (req, res) => {
         return res.status(500).json({ message: "Internal Server Error" });
     }
 };
+
+
+// const getOwnedNft = async (req, res) => {
+//     try {
+//         const verification = await verifyToken(req, res);
+//         if (!verification.isVerified) {
+//             return res.status(401).json({ status: false, message: verification.message });
+//         }
+
+//         const walletAddress = verification.data.data.walletAddress;
+
+//         // Fetch both collections in parallel
+//         const [sellNft, nft] = await Promise.all([
+//             SELLNFT.find({ ownedBy: walletAddress, isMinted: true }),
+//             NFT.find({ ownedBy: walletAddress, isMinted: true }),
+//         ]);
+
+//         // Create a Set of unique keys from sellNft (priority set)
+//         // const uniqueKeys = new Set(
+//         //     sellNft.map(nft => `${nft.tokenId}-${nft.contractAddress}`)
+//         // );
+
+//         // // Filter out duplicates from the `nft` list
+//         // const filteredNft = nft.filter(n =>
+//         //     !uniqueKeys.has(`${n.tokenId}-${n.contractAddress}`)
+//         // );
+
+//         // Combine: keep sellNft first, then only unique ones from nft
+//         const result = [...sellNft, ...filteredNft];
+
+//         // If no NFTs are found, return a 404 response
+//         if (result.length === 0) {
+//             return res.status(404).json({ status: false, message: "No owned NFTs found" });
+//         }
+
+//         return res.status(200).json({
+//             status: true,
+//             message: "Owned NFTs retrieved successfully",
+//             data: result,
+//         });
+//     } catch (error) {
+//         console.log(error);
+//         return res.status(500).json({ message: "Internal Server Error" });
+//     }
+// };
 
 const getCreatedNft = async (req, res) => {
     try {
