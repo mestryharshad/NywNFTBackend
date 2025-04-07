@@ -119,6 +119,11 @@ const getNftById = async (req, res) => {
 
         // Fetch the NFT from SELLNFT collection
         const nft = await SELLNFT.findOne({ tokenId, contractAddress });
+
+        console.log(nft);
+        const quantityDetails = await NFT.findOne({ tokenId, contractAddress });
+        console.log(quantityDetails,"fmdgkf");
+        
         if (!nft) {
             return res.status(404).json({ status: false, message: "NFT not found" });
         }
@@ -131,6 +136,7 @@ const getNftById = async (req, res) => {
 
         // Creator Details
         const collection = await COLLECTION.findOne({ contractAddress });
+
         if (!collection) {
             return res.status(404).json({ status: false, message: "Collection not found" });
         }
@@ -143,6 +149,7 @@ const getNftById = async (req, res) => {
             status: true,
             message: "Get NFT by ID",
             data: nft,
+            quantity:quantityDetails.quantity,
             ownerName: ownerName,
             ownerWallet: ownerWallet,
             ownerWalletProfile: ownerProfileImage,
